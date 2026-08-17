@@ -1,0 +1,16 @@
+{
+  "name": "wsapi",
+  "version": "1.0.0",
+  "description": "WhatsApp bulk messaging (blast) service built on the WhatsApp Cloud API, set up via Waboom",
+  "main": "src/blast.js",
+  "type": "commonjs",
+  "scripts": {
+    "blast": "node src/blast.js",
+    "test-send": "node src/blast.js --limit 1"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^16.4.5"
+  }
+}
