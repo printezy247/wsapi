@@ -7,68 +7,74 @@ the same credentials (access token + phone number ID) you'd get by doing it
 directly with Meta. This service sends messages straight to Meta's Graph API
 using those credentials.
 
-## 1. Fix the `(#100) App_id in the input_token did not match the Viewing App` error (your current blocker)
+## Step-by-step: get from where you are now to a working blast
 
-Good news: your business/number is already verified — Quality Rating is
-green and the phone number is active. This error is unrelated to
-verification. It means the **Access Token** pasted into Waboom's
-*WhatsApp Cloud API Setup* page was generated from a different Facebook
-App than the one Waboom is configured to use for your WhatsApp Business
-Account. Meta rejects any token whose owning App ID doesn't match the
-App ID Waboom is "viewing" the WABA through.
+Do these in order — later steps will keep failing until the earlier ones
+are actually done.
 
-**How to fix it:**
+1. **Verify your Business on Meta.** Go to `business.facebook.com` →
+   **Business Settings → Security Center** (or "Business Info") and check
+   **Business Verification** status. This is almost certainly the reason
+   you're seeing "WABA not allowed to manage templates" — it's separate
+   from phone number verification (which is already green/done for you).
+   Submit your legal business name, address, and a matching document
+   (business registration, utility bill) or website. Usually clears in
+   1–2 business days.
+2. **Verify your email** on the Meta developer account (Meta for
+   Developers → your app → **Settings → Basic**, check/verify the contact
+   email) so you can generate a **permanent** access token later. Until
+   it's verified, use the **Temporary access token** (24h) so you're not
+   blocked from testing in the meantime.
+3. **Fix your template body.** A variable at the very start/end, or too
+   short a body, gets auto-rejected. Use something like:
+   `Hello {{first_name}}, thanks for reaching out to us! We wanted to
+   follow up on your inquiry.` — variable in the middle, real surrounding
+   text. Also skip **Carousel** template type for your first template
+   (needs ≥2 fully-filled cards); use a plain **Marketing** template with
+   just a Body (and optional Header) — it reviews faster.
+4. **Resubmit the template** (Waboom sidebar → **Templates**) only after
+   step 1 clears — resubmitting while the business is unverified will
+   likely fail again regardless of the content fix. Approval after that is
+   usually minutes to a few hours.
+5. **Add a real phone number.** Your current number is Meta's **Test
+   Number** (`+1 555-663-0104`), capped at 5 recipients total, ever. For
+   an actual blast, go to **WhatsApp Business Info → Manage Phone
+   Numbers** and register your own business number instead.
+6. **Send the blast** — two options:
+   - **No-code**: Waboom's own **Campaigns** tab. Import your list under
+     **Contacts**, pick the approved template, launch the campaign
+     directly from the dashboard.
+   - **Scripted / more control**: use `src/blast.js` in this repo (see
+     below) — gives you per-number send logs and custom rate limiting
+     against the same WhatsApp Cloud API credentials.
 
-1. In [Meta for Developers](https://developers.facebook.com/apps), open
-   **the exact App** that's linked to WhatsApp for this project (check
-   under the app's **WhatsApp → API Setup** page — the WhatsApp Business
-   Account ID shown there must match `1546762699711638`, the ID you
-   entered in Waboom).
-2. If you have multiple Facebook Apps (common if you clicked through
-   setup more than once, or Waboom auto-created one for you), you likely
-   generated the token from the wrong one. Use **Debug Token** (the grey
-   button next to the Access Token field in your screenshot) — it will
-   show you which App ID that token actually belongs to, so you can
-   confirm the mismatch directly.
-3. Generate a fresh token from the *correct* app: **WhatsApp → API
-   Setup → Temporary access token** for a quick test, or **System Users
-   → Generate New Token** (select that same app, scopes
-   `whatsapp_business_management` + `whatsapp_business_messaging`) for a
-   permanent one.
-4. Paste that token and re-save. The "WhatsApp Business Account ID" field
-   should then also flip from ❌ to ✅ once the token/App/WABA all agree.
+## Troubleshooting log (issues already hit and fixed)
 
-If Waboom auto-provisioned the Facebook App for you (rather than you
-connecting your own), it's often simpler to disconnect and let Waboom
-recreate the whole App+WABA link from scratch than to hunt for the
-right App ID by hand — worth trying if step 1–3 doesn't resolve it.
+- **`(#100) The App_id in the input_token did not match the Viewing App`**
+  — the Access Token pasted into Waboom's *WhatsApp Cloud API Setup* page
+  was generated from a different Facebook App than the one Waboom links
+  to your WhatsApp Business Account. Fixed by using **Debug Token** to
+  confirm the mismatch, then regenerating the token from the correct App
+  (WhatsApp → API Setup, or System Users, with
+  `whatsapp_business_management` + `whatsapp_business_messaging` scopes).
+  ✅ Resolved — Access Token and WABA ID both show green now.
+- **`WABA not allowed to manage templates`** — caused by Business
+  Verification not being complete (see step 1 above). Not yet resolved.
+- **`The carousel templates must have at least 2 items`** — picked
+  Carousel template type with only 1 card filled in; Carousel needs ≥2
+  cards each with a filled Example value. Recommendation: don't use
+  Carousel for the first template.
+- **`This template has too many variables for its length` / `Variables
+  can't be at the start or end of template`** — body was just `Hello
+  {{first_name}}`, a variable with almost no surrounding static text.
+  Fix: write a full sentence around the variable (see step 3 above).
+- **`Email verification is required before generating a permanent access
+  token`** — verify the Meta developer account email (see step 2 above);
+  use the temporary token in the meantime.
 
-Once this is green, grab:
-- `WHATSAPP_ACCESS_TOKEN` (use the permanent token, not the 24h temporary one)
-- `WHATSAPP_PHONE_NUMBER_ID` — from your screenshot: `1266102803253222`
+## Using the blast script in this repo
 
-## 2. Fix the template (needed before any cold blast)
-
-Meta requires a pre-approved template to message anyone who hasn't
-messaged you in the last 24h — i.e. every recipient in a cold blast. Two
-problems in the template you were building:
-
-- **"The carousel templates must have at least 2 items"** — you picked
-  **Carousel** as the template type but only added 1 card. Carousel
-  templates need ≥2 cards, each with its own image and (if using a URL
-  button) a filled-in **Example** value for the `{{1}}` placeholder — an
-  empty Example is why submit was failing even before the card-count error.
-- **Placeholder junk in Body Text** (`` {{1}} `````` fsdfsdf__sadasd** ``)
-  — this looks like test scratch content, not real copy. Meta's review
-  rejects templates with nonsense/test text, so this needs real message
-  copy before submitting.
-
-**For a first blast template, skip Carousel** — use a plain **Marketing**
-category template with just a **Body** (optionally a text Header), no
-buttons or cards. It reviews faster and is enough to unlock messaging.
-Add the Carousel/button version later once you've confirmed sending works.
-
-## 2. Configure this project
+### Configure
 
 ```bash
 npm install
@@ -76,13 +82,13 @@ cp .env.example .env
 # fill in WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_TEMPLATE_NAME
 ```
 
-## 3. Add your contact list
+### Add your contact list
 
 Edit `data/contacts.example.csv` (or create your own) with columns
 `phone,name` — phone in international format, no `+` or spaces
 (e.g. `15551234567`).
 
-## 4. Test before blasting
+### Test before blasting
 
 ```bash
 # See what would be sent, no API calls, no credentials needed
@@ -92,7 +98,7 @@ node src/blast.js --file data/contacts.example.csv --dry-run
 node src/blast.js --file data/contacts.example.csv --limit 1
 ```
 
-## 5. Run the full blast
+### Run the full blast
 
 ```bash
 node src/blast.js --file data/contacts.csv
