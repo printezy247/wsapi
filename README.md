@@ -97,6 +97,50 @@ are actually done.
   escalated via Meta Business Help Center support with the WABA ID and
   full context. Nothing further to configure until they respond.
 
+## Auto-reply & trigger server (`src/server.js`)
+
+This runs independently of Waboom — it talks straight to Meta's Graph API
+using the same App/token/WABA you already set up, so it works today even
+while template creation is still blocked (auto-replies use free-text
+sends, which don't require an approved template — see the 24h window
+caveat under Notes / gotchas).
+
+**How it works:** Meta calls your webhook URL for every inbound message.
+`src/server.js` receives it, checks the message text against the rules in
+`src/rules.js` (first match wins), sends back the matched `reply`, and — if
+the rule has a `trigger` function — runs that too (e.g. tag the contact,
+call another API, log a lead). Add/edit rules directly in `src/rules.js`,
+no changes needed to the server itself.
+
+### Run it
+
+```bash
+npm install
+cp .env.example .env
+# fill in WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, and pick any
+# string for WEBHOOK_VERIFY_TOKEN (you'll reuse it in the next step)
+node src/server.js
+```
+
+### Expose it to Meta and register the webhook
+
+Meta needs a public HTTPS URL to call. For local testing, tunnel it (e.g.
+`ngrok http 3000`); for real use, deploy `src/server.js` somewhere with a
+stable URL (any Node host — Render, Railway, a VPS, etc).
+
+1. **developers.facebook.com/apps** → your app (**wab api**) → **WhatsApp →
+   Configuration**.
+2. Under **Webhook**, click **Edit**, enter:
+   - **Callback URL**: `https://<your-public-url>/webhook`
+   - **Verify token**: the same value as `WEBHOOK_VERIFY_TOKEN` in your `.env`
+3. Click **Verify and save** — Meta calls the GET endpoint in `server.js`,
+   which must return the challenge it sends (already implemented).
+4. Under **Webhook fields**, subscribe to **messages**.
+
+Send a WhatsApp message to your business number and you should see it
+logged in the server console, with an auto-reply sent back based on
+`src/rules.js`.
+
 ## Using the blast script in this repo
 
 ### Configure
