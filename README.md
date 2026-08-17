@@ -7,40 +7,47 @@ the same credentials (access token + phone number ID) you'd get by doing it
 directly with Meta. This service sends messages straight to Meta's Graph API
 using those credentials.
 
+## Current status (updated 2026-08-18)
+
+Setup is done: Business Portfolio "Jack PrintEzy" is verified, WABA `Jack`
+(`2774576046261860`) is owned by it, a real phone number is connected
+(`+60 11-7606 8370`, Quality Rating green, "Can Send Message: AVAILABLE"),
+and Waboom has a permanent access token with the correct scopes
+(`whatsapp_business_management`, `whatsapp_business_messaging`) — Access
+Token and WABA ID both show green/configured in Waboom.
+
+**Blocked on:** creating/approving a message template. Every attempt
+(via Waboom, and via Meta's own native WhatsApp Manager directly) returns:
+
+> This WABA is not allowed to create or update templates.
+
+This has been isolated to a genuine **Meta-side account restriction** on
+this specific WABA — it is not a Waboom bug and not a missing setting on
+our end (see troubleshooting log below for everything already ruled out).
+**Escalated to Meta support**; waiting on their response. Nothing else to
+configure until they clear it.
+
 ## Step-by-step: get from where you are now to a working blast
 
 Do these in order — later steps will keep failing until the earlier ones
 are actually done.
 
-1. **Verify your Business on Meta.** Go to `business.facebook.com` →
-   **Business Settings → Security Center** (or "Business Info") and check
-   **Business Verification** status. This is almost certainly the reason
-   you're seeing "WABA not allowed to manage templates" — it's separate
-   from phone number verification (which is already green/done for you).
-   Submit your legal business name, address, and a matching document
-   (business registration, utility bill) or website. Usually clears in
-   1–2 business days.
-2. **Verify your email** on the Meta developer account (Meta for
-   Developers → your app → **Settings → Basic**, check/verify the contact
-   email) so you can generate a **permanent** access token later. Until
-   it's verified, use the **Temporary access token** (24h) so you're not
-   blocked from testing in the meantime.
-3. **Fix your template body.** A variable at the very start/end, or too
-   short a body, gets auto-rejected. Use something like:
+1. ✅ **Verify your Business on Meta.** Done — Business Portfolio "Jack
+   PrintEzy" is verified.
+2. ✅ **Verify your email** on the Meta developer account, to allow
+   generating a permanent access token. Done.
+3. ⏳ **Create and get a template approved.** Currently blocked by the
+   Meta-side "WABA not allowed to manage templates" restriction — see
+   Current Status above. Once Meta clears it, use a body like:
    `Hello {{first_name}}, thanks for reaching out to us! We wanted to
-   follow up on your inquiry.` — variable in the middle, real surrounding
-   text. Also skip **Carousel** template type for your first template
-   (needs ≥2 fully-filled cards); use a plain **Marketing** template with
-   just a Body (and optional Header) — it reviews faster.
-4. **Resubmit the template** (Waboom sidebar → **Templates**) only after
-   step 1 clears — resubmitting while the business is unverified will
-   likely fail again regardless of the content fix. Approval after that is
-   usually minutes to a few hours.
-5. **Add a real phone number.** Your current number is Meta's **Test
-   Number** (`+1 555-663-0104`), capped at 5 recipients total, ever. For
-   an actual blast, go to **WhatsApp Business Info → Manage Phone
-   Numbers** and register your own business number instead.
-6. **Send the blast** — two options:
+   follow up on your inquiry.` (or `{{1}}` if using Number-type variables
+   instead of Named) — variable in the middle, real surrounding text, and
+   a filled sample value. Skip Carousel template type for the first
+   template (needs ≥2 fully-filled cards); use a plain Marketing template
+   with just a Body.
+4. ✅ **Add a real phone number.** Done — `+60 11-7606 8370` is connected
+   and active (no longer on Meta's capped Test Number).
+5. **Send the blast** — two options, once step 3 clears:
    - **No-code**: Waboom's own **Campaigns** tab. Import your list under
      **Contacts**, pick the approved template, launch the campaign
      directly from the dashboard.
@@ -48,29 +55,47 @@ are actually done.
      below) — gives you per-number send logs and custom rate limiting
      against the same WhatsApp Cloud API credentials.
 
-## Troubleshooting log (issues already hit and fixed)
+## Troubleshooting log
 
 - **`(#100) The App_id in the input_token did not match the Viewing App`**
   — the Access Token pasted into Waboom's *WhatsApp Cloud API Setup* page
   was generated from a different Facebook App than the one Waboom links
   to your WhatsApp Business Account. Fixed by using **Debug Token** to
   confirm the mismatch, then regenerating the token from the correct App
-  (WhatsApp → API Setup, or System Users, with
-  `whatsapp_business_management` + `whatsapp_business_messaging` scopes).
-  ✅ Resolved — Access Token and WABA ID both show green now.
-- **`WABA not allowed to manage templates`** — caused by Business
-  Verification not being complete (see step 1 above). Not yet resolved.
+  with `whatsapp_business_management` + `whatsapp_business_messaging`
+  scopes. ✅ Resolved.
+- **`Unsupported delete request... missing permissions`** on Save in
+  Waboom — the System User generating the token had the **App** assigned
+  as an asset but not the **WhatsApp account** itself (Business Settings
+  → System Users → Assigned assets → Add assets → WhatsApp accounts).
+  Regenerating the token after assigning the WABA asset fixed it. ✅
+  Resolved.
 - **`The carousel templates must have at least 2 items`** — picked
   Carousel template type with only 1 card filled in; Carousel needs ≥2
-  cards each with a filled Example value. Recommendation: don't use
-  Carousel for the first template.
+  cards each with a filled Example value. Avoided by using a plain
+  Marketing/Body-only template instead.
 - **`This template has too many variables for its length` / `Variables
   can't be at the start or end of template`** — body was just `Hello
   {{first_name}}`, a variable with almost no surrounding static text.
-  Fix: write a full sentence around the variable (see step 3 above).
+  Fixed by writing a full sentence around the variable.
+- **`This template contains variable parameters with incorrect
+  formatting`** — body used a named variable (`{{first_name}}`) while
+  "Type of variable" was set to `Number`; Number-type templates require
+  numbered placeholders (`{{1}}`, `{{2}}`, ...). Fix: either switch "Type
+  of variable" to `Named`, or change the placeholder to `{{1}}`.
 - **`Email verification is required before generating a permanent access
-  token`** — verify the Meta developer account email (see step 2 above);
-  use the temporary token in the meantime.
+  token`** — verified the Meta developer account email; used the
+  temporary token in the meantime. ✅ Resolved.
+- **`WABA not allowed to manage templates` / `This WABA is not allowed to
+  create or update templates`** — ⏳ **Not resolved.** Ruled out: Business
+  Verification (done), WABA ownership by the verified business (confirmed
+  in Business Settings → WhatsApp accounts), phone number status (green,
+  AVAILABLE), and Waboom-specific bugs (same error reproduces in Meta's
+  own native WhatsApp Manager, with no Waboom involved). No restriction
+  banner appears anywhere in WhatsApp Manager's Overview/Alerts. This
+  points to a backend-only account flag Meta needs to clear manually —
+  escalated via Meta Business Help Center support with the WABA ID and
+  full context. Nothing further to configure until they respond.
 
 ## Using the blast script in this repo
 
